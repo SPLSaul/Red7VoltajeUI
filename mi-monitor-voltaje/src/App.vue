@@ -48,7 +48,7 @@ export default {
       sensorId: 1,
       selectedEndpoint: 'local',
       externalUrl: 'https://093f4030b48a.ngrok-free.app',
-      apiUrl: 'http://192.166.0.254:8000/api/v1/sensor_data',
+      apiUrl: 'http://192.166.0.254:3000/api/v1/sensor_data',
       chartData: [],
       currentVoltage: null,
       autoUpdate: false,
