@@ -96,7 +96,7 @@ export default {
       console.log('Chart instance:', this.chart)
 
 
-      this.lineSeries = this.chart.addSeries(AreaSeries,{
+      this.lineSeries = this.chart.addSeries(lineSeries,{
         color: '#3498db',
         lineWidth: 3,
         crosshairMarkerVisible: true,
