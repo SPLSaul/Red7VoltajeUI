@@ -19,8 +19,8 @@
 </template>
 
 <script>
-import * as LightweightCharts from 'lightweight-charts'
-
+import { createChart } from 'lightweight-charts';
+  
 export default {
   name: 'VoltageChart',
   props: {
@@ -96,7 +96,7 @@ export default {
       console.log('Chart instance:', this.chart)
 
 
-      this.lineSeries = this.chart.addLineSeries({
+      this.lineSeries = this.chart.addSeries({
         color: '#3498db',
         lineWidth: 3,
         crosshairMarkerVisible: true,
