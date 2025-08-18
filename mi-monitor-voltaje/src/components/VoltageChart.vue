@@ -69,7 +69,7 @@ export default {
       const container = this.$refs.chartContainer
       if (!container) return
 
-      this.chart = LightweightCharts.createChart(container, {
+      this.chart = createChart(container, {
         width: container.clientWidth,
         height: 450,
         layout: {
