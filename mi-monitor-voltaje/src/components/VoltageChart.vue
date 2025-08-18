@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import { createChart } from 'lightweight-charts'
+import * as LightweightCharts from 'lightweight-charts'
 
 export default {
   name: 'VoltageChart',
@@ -69,7 +69,7 @@ export default {
       const container = this.$refs.chartContainer
       if (!container) return
 
-      this.chart = createChart(container, {
+      this.chart = LightweightCharts.createChart(container, {
         width: container.clientWidth,
         height: 450,
         layout: {
