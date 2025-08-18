@@ -91,7 +91,10 @@ export default {
         crosshair: {
           mode: 1, // CrosshairMode.Normal
         },
+        
       })
+      console.log('Chart instance:', this.chart)
+
 
       this.lineSeries = this.chart.addLineSeries({
         color: '#3498db',
