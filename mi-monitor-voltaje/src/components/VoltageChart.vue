@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import { createChart } from 'lightweight-charts';
+import { createChart, AreaSeries } from 'lightweight-charts';
   
 export default {
   name: 'VoltageChart',
@@ -40,7 +40,7 @@ export default {
   data() {
     return {
       chart: null,
-      lineSeries: null
+      areaSeries: null
     }
   },
   mounted() {
@@ -56,8 +56,8 @@ export default {
   watch: {
     chartData: {
       handler(newData) {
-        if (this.lineSeries && newData.length > 0) {
-          this.lineSeries.setData(newData)
+        if (this.areaSeries && newData.length > 0) {
+          this.areaSeries.setData(newData)
           this.chart.timeScale().fitContent()
         }
       },
@@ -95,8 +95,7 @@ export default {
       })
       console.log('Chart instance:', this.chart)
 
-
-      this.lineSeries = this.chart.addSeries(lineSeries,{
+      this.areaSeries = this.chart.addSeries(AreaSeries,{
         color: '#3498db',
         lineWidth: 3,
         crosshairMarkerVisible: true,
@@ -109,7 +108,7 @@ export default {
 
       // Set initial data if available
       if (this.chartData.length > 0) {
-        this.lineSeries.setData(this.chartData)
+        this.areaSeries.setData(this.chartData)
         this.chart.timeScale().fitContent()
       }
     },
