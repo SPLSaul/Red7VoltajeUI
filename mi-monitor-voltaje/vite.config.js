@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 export default defineConfig({
   plugins: [vue()],
+  base: '/Red7VoltajeUI/', 
   server: {
     port: 3000,
     host: true
