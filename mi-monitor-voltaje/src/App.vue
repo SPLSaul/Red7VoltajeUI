@@ -94,49 +94,57 @@ export default {
       }
     },
 
-    async fetchData() {
-      this.loading = true
-      this.error = null
+async fetchData() {
+  this.loading = true
+  this.error = null
 
-      try {
-        const url = `${this.apiUrl}/${this.sensorId}/recent`
-        console.log('Fetching from:', url)
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        })
+  try {
+    const url = `${this.apiUrl}/${this.sensorId}/recent`
+    console.log('Fetching from:', url)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+    })
 
-        if (!response.ok) {
-          throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`)
-        }
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`)
+    }
 
-        const data = await response.json()
-        console.log('Data received:', data)
+    // Leer como texto primero
+    const text = await response.text()
+    console.log('RAW response:', text)
 
-        if (data.readings && Array.isArray(data.readings)) {
-          this.processData(data.readings)
-          this.isOnline = true
-          this.lastUpdate = new Date().toLocaleTimeString('es-MX')
-          
-          if (data.readings.length > 0) {
-            this.currentVoltage = data.readings[0].voltage
-          }
-        } else {
-          throw new Error('Formato de datos inválido')
-        }
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch (err) {
+      throw new Error('Respuesta no es JSON válido')
+    }
 
-      } catch (error) {
-        console.error('Error fetching data:', error)
-        this.error = `Error al obtener datos: ${error.message}`
-        this.isOnline = false
-      } finally {
-        this.loading = false
+    if (data.readings && Array.isArray(data.readings)) {
+      this.processData(data.readings)
+      this.isOnline = true
+      this.lastUpdate = new Date().toLocaleTimeString('es-MX')
+      
+      if (data.readings.length > 0) {
+        this.currentVoltage = data.readings[0].voltage
       }
-    },
+    } else {
+      throw new Error('Formato de datos inválido')
+    }
+
+  } catch (error) {
+    console.error('Error fetching data:', error)
+    this.error = `Error al obtener datos: ${error.message}`
+    this.isOnline = false
+  } finally {
+    this.loading = false
+  }
+},
 
     processData(readings) {
       // Convert timestamp to chart format and sort by time
