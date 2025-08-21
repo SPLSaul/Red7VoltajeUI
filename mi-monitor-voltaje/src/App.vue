@@ -47,7 +47,7 @@ export default {
     return {
       sensorId: 1,
       selectedEndpoint: 'local',
-      externalUrl: 'https://093f4030b48a.ngrok-free.app',
+      externalUrl: 'https://b18811412a85.ngrok-free.app',
       apiUrl: '',
       chartData: [],
       currentVoltage: null,
