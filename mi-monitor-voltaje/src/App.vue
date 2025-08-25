@@ -48,7 +48,7 @@ export default {
       sensorId: 1,
       selectedEndpoint: 'local',
       externalUrl: 'https://b18811412a85.ngrok-free.app',
-      apiUrl: '',
+      apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
       currentVoltage: null,
       autoUpdate: false,
@@ -56,11 +56,12 @@ export default {
       error: null,
       lastUpdate: 'Nunca',
       isOnline: false,
-      intervalId: null
+      intervalId: null,
+      // Define the target timezone
+      targetTimezone: 'America/Los_Angeles' // -07:00 corresponds to PDT
     }
   },
   mounted() {
-    this.urlapi = import.meta.apiurlLocal;
     this.fetchData()
   },
   beforeUnmount() {
@@ -88,72 +89,116 @@ export default {
 
     updateApiUrl() {
       if (this.selectedEndpoint === 'local') {
-        this.apiUrl = 'http://192.166.0.254:8000/api/v1/sensor_data'
+        this.apiUrl = import.meta.env.VITE_API_URL
       } else {
         this.apiUrl = `${this.externalUrl}/api/v1/sensor_data`
       }
     },
 
-async fetchData() {
-  this.loading = true
-  this.error = null
+    async fetchData() {
+      this.loading = true
+      this.error = null
 
-  try {
-    const url = `${this.apiUrl}/${this.sensorId}/recent`
-    console.log('Fetching from:', url)
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-    })
+      try {
+        const url = `${this.apiUrl}/${this.sensorId}/recent`
+        console.log('Fetching from:', url)
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        })
 
-    if (!response.ok) {
-      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`)
-    }
+        if (!response.ok) {
+          throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`)
+        }
 
-    // Leer como texto primero
-    const text = await response.text()
-    console.log('RAW response:', text)
+        const text = await response.text()
+        console.log('RAW response:', text)
 
-    let data
-    try {
-      data = JSON.parse(text)
-    } catch (err) {
-      throw new Error('Respuesta no es JSON válido')
-    }
+        let data
+        try {
+          data = JSON.parse(text)
+        } catch (err) {
+          throw new Error('Respuesta no es JSON válido')
+        }
 
-    if (data.readings && Array.isArray(data.readings)) {
-      this.processData(data.readings)
-      this.isOnline = true
-      this.lastUpdate = new Date().toLocaleTimeString('es-MX')
-      
-      if (data.readings.length > 0) {
-        this.currentVoltage = data.readings[0].voltage
+        if (data.readings && Array.isArray(data.readings)) {
+          this.processData(data.readings)
+          this.isOnline = true
+          
+          if (data.readings.length > 0) {
+            this.currentVoltage = data.readings[0].voltage
+            // Update lastUpdate using the most recent reading's timestamp
+            const mostRecentReading = data.readings[0]
+            this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
+          }
+        } else {
+          throw new Error('Formato de datos inválido')
+        }
+
+      } catch (error) {
+        console.error('Error fetching data:', error)
+        this.error = `Error al obtener datos: ${error.message}`
+        this.isOnline = false
+      } finally {
+        this.loading = false
       }
-    } else {
-      throw new Error('Formato de datos inválido')
-    }
+    },
 
-  } catch (error) {
-    console.error('Error fetching data:', error)
-    this.error = `Error al obtener datos: ${error.message}`
-    this.isOnline = false
-  } finally {
-    this.loading = false
-  }
-},
+    /**
+     * Format a timestamp string for display, preserving the original timezone
+     */
+    formatTimestampForDisplay(timestampString) {
+      try {
+        const date = new Date(timestampString)
+        // Mantener el formato original con el offset
+        return date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZone: 'America/Los_Angeles'  // ← Forzar timezone específico
+        }) + ' PDT'
+      } catch (error) {
+        console.error('Error formatting timestamp:', error)
+        return 'Error en formato'
+      }
+    },
+
+    /**
+     * Convert timestamp to Unix timestamp for chart, preserving timezone context
+     */
+    timestampToUnix(timestampString) {
+      try {
+        const date = new Date(timestampString)
+        const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
+    return Math.floor(timeWithOffset / 1000)
+        } catch (error) {
+        console.error('Error converting timestamp:', error)
+        return 0
+      }
+    },
 
     processData(readings) {
-      // Convert timestamp to chart format and sort by time
-      const chartPoints = readings.map(reading => ({
-        time: Math.floor(new Date(reading.timestamp).getTime() / 1000),
-        value: reading.voltage
-      })).sort((a, b) => a.time - b.time)
+      // Sort readings by timestamp first (newest first based on your data structure)
+      const sortedReadings = [...readings].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
 
-      this.chartData = chartPoints
+      // Convert to chart format, preserving the original timestamp timezone
+      const chartPoints = sortedReadings.map(reading => ({
+        time: this.timestampToUnix(reading.timestamp),
+        value: reading.voltage,
+        // Keep original timestamp for debugging/reference
+        originalTimestamp: reading.timestamp
+      }))
+
+      // Sort chart points by time for proper display (oldest first for chart)
+      this.chartData = chartPoints.sort((a, b) => a.time - b.time)
+
+      console.log('Processed chart data:', this.chartData)
     },
 
     toggleAutoUpdate() {
