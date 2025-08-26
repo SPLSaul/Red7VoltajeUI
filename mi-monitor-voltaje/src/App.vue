@@ -1,5 +1,8 @@
 <template>
   <div class="container">
+    <!-- Agrega el componente de la barra lateral con la propiedad 'menu' -->
+    <sidebar-menu :menu="menu" />
+
     <StatusHeader 
       :isOnline="isOnline"
       :sensorId="sensorId"
@@ -32,6 +35,7 @@
 </template>
 
 <script>
+// Elimina la importación del componente SidebarMenu, ya que se usa de forma global
 import StatusHeader from './components/StatusHeader.vue'
 import ControlPanel from './components/ControlPanel.vue'
 import VoltageChart from './components/VoltageChart.vue'
@@ -41,10 +45,42 @@ export default {
   components: {
     StatusHeader,
     ControlPanel,
-    VoltageChart
+    VoltageChart,
   },
   data() {
     return {
+      // Datos del menú para la barra lateral
+      menu: [
+        {
+          header: 'Main Navigation',
+          hiddenOnCollapse: true,
+        },
+        {
+          href: '/',
+          title: 'Dashboard',
+          icon: 'fa fa-tachometer-alt',
+        },
+        {
+          href: '/sensors',
+          title: 'Sensores',
+          icon: 'fa fa-cogs',
+          child: [
+            {
+              href: '/sensors/list',
+              title: 'Lista de Sensores',
+            },
+            {
+              href: '/sensors/settings',
+              title: 'Configuración',
+            },
+          ],
+        },
+        {
+          href: '/settings',
+          title: 'Ajustes',
+          icon: 'fa fa-cog',
+        },
+      ],
       sensorId: 1,
       selectedEndpoint: 'local',
       externalUrl: 'https://b18811412a85.ngrok-free.app',
@@ -57,8 +93,7 @@ export default {
       lastUpdate: 'Nunca',
       isOnline: false,
       intervalId: null,
-      // Define the target timezone
-      targetTimezone: 'America/Los_Angeles' // -07:00 corresponds to PDT
+      targetTimezone: 'America/Los_Angeles'
     }
   },
   mounted() {
@@ -131,7 +166,6 @@ export default {
           
           if (data.readings.length > 0) {
             this.currentVoltage = data.readings[0].voltage
-            // Update lastUpdate using the most recent reading's timestamp
             const mostRecentReading = data.readings[0]
             this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
           }
@@ -149,17 +183,16 @@ export default {
     },
 
     /**
-     * Format a timestamp string for display, preserving the original timezone
-     */
+      * Format a timestamp string for display, preserving the original timezone
+      */
     formatTimestampForDisplay(timestampString) {
       try {
         const date = new Date(timestampString)
-        // Mantener el formato original con el offset
         return date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-          timeZone: 'America/Los_Angeles'  // ← Forzar timezone específico
+          timeZone: 'America/Los_Angeles' 
         }) + ' PDT'
       } catch (error) {
         console.error('Error formatting timestamp:', error)
@@ -168,34 +201,30 @@ export default {
     },
 
     /**
-     * Convert timestamp to Unix timestamp for chart, preserving timezone context
-     */
+      * Convert timestamp to Unix timestamp for chart, preserving timezone context
+      */
     timestampToUnix(timestampString) {
       try {
         const date = new Date(timestampString)
         const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
-    return Math.floor(timeWithOffset / 1000)
-        } catch (error) {
+        return Math.floor(timeWithOffset / 1000)
+      } catch (error) {
         console.error('Error converting timestamp:', error)
         return 0
       }
     },
 
     processData(readings) {
-      // Sort readings by timestamp first (newest first based on your data structure)
       const sortedReadings = [...readings].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
 
-      // Convert to chart format, preserving the original timestamp timezone
       const chartPoints = sortedReadings.map(reading => ({
         time: this.timestampToUnix(reading.timestamp),
         value: reading.voltage,
-        // Keep original timestamp for debugging/reference
         originalTimestamp: reading.timestamp
       }))
 
-      // Sort chart points by time for proper display (oldest first for chart)
       this.chartData = chartPoints.sort((a, b) => a.time - b.time)
 
       console.log('Processed chart data:', this.chartData)
