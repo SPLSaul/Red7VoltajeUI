@@ -1,11 +1,6 @@
 <template>
   <div class="controls">
     <div class="control-group">
-      <label>Endpoint:</label>
-      <select :value="selectedEndpoint" @change="$emit('update-endpoint', $event.target.value)">
-        <option value="local">Local (192.168.0.254)</option>
-        <option value="external">Externo (ngrok)</option>
-      </select>
       <input 
         v-if="selectedEndpoint === 'external'" 
         :value="externalUrl"
@@ -14,30 +9,7 @@
         class="external-url-input"
       >
     </div>
-    <div class="control-group">
-      <label>ID del Sensor:</label>
-      <input 
-        type="number" 
-        :value="sensorId"
-        @input="$emit('update-sensor-id', parseInt($event.target.value))"
-        min="1" 
-        class="sensor-id-input"
-      >
-      <button 
-        class="btn" 
-        @click="$emit('toggle-auto-update')"
-        :disabled="loading"
-      >
-        {{ autoUpdate ? 'Pausar' : 'Iniciar' }} Auto-actualización
-      </button>
-      <button 
-        class="btn" 
-        @click="$emit('fetch-data')"
-        :disabled="loading"
-      >
-        Actualizar Ahora
-      </button>
-    </div>
+  
   </div>
 </template>
 

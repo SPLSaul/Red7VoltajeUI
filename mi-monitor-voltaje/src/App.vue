@@ -1,5 +1,8 @@
 <template>
   <div class="container">
+    <!-- Agrega el componente de la barra lateral con la propiedad 'menu' -->
+    <sidebar-menu :menu="menu" />
+
     <StatusHeader 
       :isOnline="isOnline"
       :sensorId="sensorId"
@@ -32,6 +35,7 @@
 </template>
 
 <script>
+// Elimina la importación del componente SidebarMenu, ya que se usa de forma global
 import StatusHeader from './components/StatusHeader.vue'
 import ControlPanel from './components/ControlPanel.vue'
 import VoltageChart from './components/VoltageChart.vue'
@@ -41,12 +45,46 @@ export default {
   components: {
     StatusHeader,
     ControlPanel,
-    VoltageChart
+    VoltageChart,
   },
   data() {
     return {
+      // Datos del menú para la barra lateral
+      menu: [
+        {
+          header: 'Main Navigation',
+          hiddenOnCollapse: true,
+        },
+        {
+          href: '/',
+          title: 'Dashboard',
+          icon: 'fa fa-tachometer-alt',
+        },
+        {
+          href: '/sensors',
+          title: 'Sensores',
+          icon: 'fa fa-cogs',
+          child: [
+            {
+              href: '/sensors/list',
+              title: 'Lista de Sensores',
+            },
+            {
+              href: '/sensors/settings',
+              title: 'Configuración',
+            },
+          ],
+        },
+        {
+          href: '/settings',
+          title: 'Ajustes',
+          icon: 'fa fa-cog',
+        },
+      ],
       sensorId: 1,
       selectedEndpoint: 'local',
+      externalUrl: 'https://b18811412a85.ngrok-free.app',
+      apiUrl: import.meta.env.VITE_API_URL, 
       externalUrl: 'https://b18811412a85.ngrok-free.app',
       apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
@@ -56,6 +94,8 @@ export default {
       error: null,
       lastUpdate: 'Nunca',
       isOnline: false,
+      intervalId: null,
+      targetTimezone: 'America/Los_Angeles'
       intervalId: null,
       // Define the target timezone
       targetTimezone: 'America/Los_Angeles' // -07:00 corresponds to PDT
@@ -89,6 +129,7 @@ export default {
 
     updateApiUrl() {
       if (this.selectedEndpoint === 'local') {
+        this.apiUrl = import.meta.env.VITE_API_URL
         this.apiUrl = import.meta.env.VITE_API_URL
       } else {
         this.apiUrl = `${this.externalUrl}/api/v1/sensor_data`
@@ -124,6 +165,15 @@ export default {
         } catch (err) {
           throw new Error('Respuesta no es JSON válido')
         }
+        const text = await response.text()
+        console.log('RAW response:', text)
+
+        let data
+        try {
+          data = JSON.parse(text)
+        } catch (err) {
+          throw new Error('Respuesta no es JSON válido')
+        }
 
         if (data.readings && Array.isArray(data.readings)) {
           this.processData(data.readings)
@@ -131,6 +181,8 @@ export default {
           
           if (data.readings.length > 0) {
             this.currentVoltage = data.readings[0].voltage
+            const mostRecentReading = data.readings[0]
+            this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
             // Update lastUpdate using the most recent reading's timestamp
             const mostRecentReading = data.readings[0]
             this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
@@ -145,6 +197,38 @@ export default {
         this.isOnline = false
       } finally {
         this.loading = false
+      }
+    },
+
+    /**
+      * Format a timestamp string for display, preserving the original timezone
+      */
+    formatTimestampForDisplay(timestampString) {
+      try {
+        const date = new Date(timestampString)
+        return date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZone: 'America/Los_Angeles' 
+        }) + ' PDT'
+      } catch (error) {
+        console.error('Error formatting timestamp:', error)
+        return 'Error en formato'
+      }
+    },
+
+    /**
+      * Convert timestamp to Unix timestamp for chart, preserving timezone context
+      */
+    timestampToUnix(timestampString) {
+      try {
+        const date = new Date(timestampString)
+        const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
+        return Math.floor(timeWithOffset / 1000)
+      } catch (error) {
+        console.error('Error converting timestamp:', error)
+        return 0
       }
     },
 
@@ -182,6 +266,17 @@ export default {
     },
 
     processData(readings) {
+      const sortedReadings = [...readings].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+
+      const chartPoints = sortedReadings.map(reading => ({
+        time: this.timestampToUnix(reading.timestamp),
+        value: reading.voltage,
+        originalTimestamp: reading.timestamp
+      }))
+
+      this.chartData = chartPoints.sort((a, b) => a.time - b.time)
       // Sort readings by timestamp first (newest first based on your data structure)
       const sortedReadings = [...readings].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -198,6 +293,7 @@ export default {
       // Sort chart points by time for proper display (oldest first for chart)
       this.chartData = chartPoints.sort((a, b) => a.time - b.time)
 
+      console.log('Processed chart data:', this.chartData)
       console.log('Processed chart data:', this.chartData)
     },
 

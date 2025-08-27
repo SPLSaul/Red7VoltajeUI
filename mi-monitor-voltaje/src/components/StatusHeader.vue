@@ -1,13 +1,13 @@
 <template>
   <div class="header">
-    <h1>Monitor de Voltaje en Tiempo Real</h1>
+    <h1>Monitor de Voltaje</h1>
     <div class="status-info">
       <div class="status-item">
         <div :class="['status-dot', isOnline ? 'status-online' : 'status-offline']"></div>
         <span>{{ isOnline ? 'Conectado' : 'Desconectado' }}</span>
       </div>
       <div class="status-item">
-        <span>Sensor ID: {{ sensorId }}</span>
+        <span>Sensor: {{ sensorId }}</span>
       </div>
       <div class="status-item">
         <span>Última actualización: {{ lastUpdate }}</span>
