@@ -85,8 +85,6 @@ export default {
       selectedEndpoint: 'local',
       externalUrl: 'https://b18811412a85.ngrok-free.app',
       apiUrl: import.meta.env.VITE_API_URL, 
-      externalUrl: 'https://b18811412a85.ngrok-free.app',
-      apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
       currentVoltage: null,
       autoUpdate: false,
@@ -94,11 +92,8 @@ export default {
       error: null,
       lastUpdate: 'Nunca',
       isOnline: false,
-      intervalId: null,
-      targetTimezone: 'America/Los_Angeles'
-      intervalId: null,
-      // Define the target timezone
-      targetTimezone: 'America/Los_Angeles' // -07:00 corresponds to PDT
+      intervalId: null, // Definición única
+      targetTimezone: 'America/Los_Angeles' // Definición única
     }
   },
   mounted() {
@@ -130,7 +125,6 @@ export default {
     updateApiUrl() {
       if (this.selectedEndpoint === 'local') {
         this.apiUrl = import.meta.env.VITE_API_URL
-        this.apiUrl = import.meta.env.VITE_API_URL
       } else {
         this.apiUrl = `${this.externalUrl}/api/v1/sensor_data`
       }
@@ -148,7 +142,7 @@ export default {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            // 'Content-Type': 'application/json' - Eliminado, no necesario para GET
           },
         })
 
@@ -156,15 +150,6 @@ export default {
           throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`)
         }
 
-        const text = await response.text()
-        console.log('RAW response:', text)
-
-        let data
-        try {
-          data = JSON.parse(text)
-        } catch (err) {
-          throw new Error('Respuesta no es JSON válido')
-        }
         const text = await response.text()
         console.log('RAW response:', text)
 
@@ -183,9 +168,6 @@ export default {
             this.currentVoltage = data.readings[0].voltage
             const mostRecentReading = data.readings[0]
             this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
-            // Update lastUpdate using the most recent reading's timestamp
-            const mostRecentReading = data.readings[0]
-            this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
           }
         } else {
           throw new Error('Formato de datos inválido')
@@ -201,8 +183,8 @@ export default {
     },
 
     /**
-      * Format a timestamp string for display, preserving the original timezone
-      */
+     * Format a timestamp string for display, preserving the original timezone
+     */
     formatTimestampForDisplay(timestampString) {
       try {
         const date = new Date(timestampString)
@@ -219,47 +201,14 @@ export default {
     },
 
     /**
-      * Convert timestamp to Unix timestamp for chart, preserving timezone context
-      */
-    timestampToUnix(timestampString) {
-      try {
-        const date = new Date(timestampString)
-        const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
-        return Math.floor(timeWithOffset / 1000)
-      } catch (error) {
-        console.error('Error converting timestamp:', error)
-        return 0
-      }
-    },
-
-    /**
-     * Format a timestamp string for display, preserving the original timezone
-     */
-    formatTimestampForDisplay(timestampString) {
-      try {
-        const date = new Date(timestampString)
-        // Mantener el formato original con el offset
-        return date.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          timeZone: 'America/Los_Angeles'  // ← Forzar timezone específico
-        }) + ' PDT'
-      } catch (error) {
-        console.error('Error formatting timestamp:', error)
-        return 'Error en formato'
-      }
-    },
-
-    /**
      * Convert timestamp to Unix timestamp for chart, preserving timezone context
      */
     timestampToUnix(timestampString) {
       try {
         const date = new Date(timestampString)
         const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
-    return Math.floor(timeWithOffset / 1000)
-        } catch (error) {
+        return Math.floor(timeWithOffset / 1000)
+      } catch (error) {
         console.error('Error converting timestamp:', error)
         return 0
       }
@@ -277,23 +226,7 @@ export default {
       }))
 
       this.chartData = chartPoints.sort((a, b) => a.time - b.time)
-      // Sort readings by timestamp first (newest first based on your data structure)
-      const sortedReadings = [...readings].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )
 
-      // Convert to chart format, preserving the original timestamp timezone
-      const chartPoints = sortedReadings.map(reading => ({
-        time: this.timestampToUnix(reading.timestamp),
-        value: reading.voltage,
-        // Keep original timestamp for debugging/reference
-        originalTimestamp: reading.timestamp
-      }))
-
-      // Sort chart points by time for proper display (oldest first for chart)
-      this.chartData = chartPoints.sort((a, b) => a.time - b.time)
-
-      console.log('Processed chart data:', this.chartData)
       console.log('Processed chart data:', this.chartData)
     },
 
