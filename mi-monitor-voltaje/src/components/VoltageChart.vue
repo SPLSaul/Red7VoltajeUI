@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import { createChart, AreaSeries } from 'lightweight-charts';
+import { createChart, BaselineSeries } from 'lightweight-charts';
   
 export default {
   name: 'VoltageChart',
@@ -40,7 +40,7 @@ export default {
   data() {
     return {
       chart: null,
-      areaSeries: null
+      baseSeries: null
     }
   },
   mounted() {
@@ -56,8 +56,8 @@ export default {
   watch: {
     chartData: {
       handler(newData) {
-        if (this.areaSeries && newData.length > 0) {
-          this.areaSeries.setData(newData)
+        if (this.baseSeries && newData.length > 0) {
+          this.baseSeries.setData(newData)
           this.chart.timeScale().fitContent()
         }
       },
@@ -73,12 +73,12 @@ export default {
         width: container.clientWidth,
         height: 450,
         layout: {
-          background: { color: '#ffffff' },
-          textColor: '#2c3e50',
+          background: { color: '#0d0c0c' },
+          textColor: '#cfd4d4',
         },
         grid: {
-          vertLines: { color: '#e9ecef' },
-          horzLines: { color: '#e9ecef' },
+          vertLines: { color: '#8b8c8c' },
+          horzLines: { color: '#8b8c8c' },
         },
         rightPriceScale: {
           borderColor: '#e9ecef',
@@ -95,20 +95,14 @@ export default {
       })
       console.log('Chart instance:', this.chart)
 
-      this.areaSeries = this.chart.addSeries(AreaSeries,{
-        color: '#3498db',
-        lineWidth: 3,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 6,
-        priceFormat: {
-          type: 'custom',
-          formatter: (price) => price.toFixed(2) + 'V',
-        },
-      })
+      this.baseSeries = this.chart.addSeries(BaselineSeries, { baseValue: { type: 'price', price: 95 },
+      topLineColor: 'rgba(47, 250, 145, 1)', topFillColor1: 'rgba( 38, 166, 154, 0.28)', 
+      topFillColor2: 'rgba( 38, 166, 154, 0.05)', bottomLineColor: 'rgba( 239, 83, 80, 1)', 
+      bottomFillColor1: 'rgba( 239, 83, 80, 0.05)', bottomFillColor2: 'rgba( 239, 83, 80, 0.28)' })
 
       // Set initial data if available
       if (this.chartData.length > 0) {
-        this.areaSeries.setData(this.chartData)
+        this.baseSeries.setData(this.chartData)
         this.chart.timeScale().fitContent()
       }
     },
@@ -127,10 +121,12 @@ export default {
 <style scoped>
 .chart-container {
   padding: 30px;
+    background: rgb(3, 3, 3);
+
 }
 
 .chart-wrapper {
-  background: white;
+  background: rgb(3, 3, 3);
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -138,7 +134,7 @@ export default {
 
 .chart-header {
   padding: 20px;
-  background: #f8f9fa;
+  background: #010101;
   border-bottom: 1px solid #e9ecef;
   display: flex;
   justify-content: space-between;

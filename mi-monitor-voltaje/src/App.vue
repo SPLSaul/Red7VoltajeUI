@@ -18,7 +18,6 @@
       @update-endpoint="handleEndpointUpdate"
       @update-external-url="handleExternalUrlUpdate"
       @update-sensor-id="handleSensorIdUpdate"
-      @toggle-auto-update="toggleAutoUpdate"
       @fetch-data="fetchData"
     />
 
@@ -87,7 +86,7 @@ export default {
       apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
       currentVoltage: null,
-      autoUpdate: false,
+      autoUpdate: true,
       loading: false,
       error: null,
       lastUpdate: 'Nunca',
@@ -98,6 +97,7 @@ export default {
   },
   mounted() {
     this.fetchData()
+    this.startAutoUpdate(); 
   },
   beforeUnmount() {
     this.stopAutoUpdate()
@@ -228,14 +228,6 @@ export default {
       this.chartData = chartPoints.sort((a, b) => a.time - b.time)
 
       console.log('Processed chart data:', this.chartData)
-    },
-
-    toggleAutoUpdate() {
-      if (this.autoUpdate) {
-        this.stopAutoUpdate()
-      } else {
-        this.startAutoUpdate()
-      }
     },
 
     startAutoUpdate() {
