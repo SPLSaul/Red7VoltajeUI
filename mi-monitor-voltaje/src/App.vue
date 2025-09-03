@@ -1,8 +1,5 @@
 <template>
   <div class="container">
-    <!-- Agrega el componente de la barra lateral con la propiedad 'menu' -->
-    <sidebar-menu :menu="menu" />
-
     <StatusHeader 
       :isOnline="isOnline"
       :sensorId="sensorId"
@@ -15,10 +12,16 @@
       :sensorId="sensorId"
       :autoUpdate="autoUpdate"
       :loading="loading"
+      :startDate="startDate"    
+      :endDate="endDate"      
       @update-endpoint="handleEndpointUpdate"
       @update-external-url="handleExternalUrlUpdate"
       @update-sensor-id="handleSensorIdUpdate"
+      @toggle-auto-update="toggleAutoUpdate"
       @fetch-data="fetchData"
+      @update-start-date="handleStartDateUpdate" 
+      @update-end-date="handleEndDateUpdate"   
+      @apply-date-filter="fetchData" 
     />
 
     <div v-if="error" class="error-message">
@@ -30,14 +33,21 @@
       :currentVoltage="currentVoltage"
       :loading="loading && !chartData.length"
     />
+    
+    <!-- Componente del menú expandible -->
+    <InlineMenuView 
+      :minVoltage="minMaxVoltages.min"
+      :maxVoltage="minMaxVoltages.max"
+    />
+
   </div>
 </template>
 
 <script>
-// Elimina la importación del componente SidebarMenu, ya que se usa de forma global
 import StatusHeader from './components/StatusHeader.vue'
 import ControlPanel from './components/ControlPanel.vue'
 import VoltageChart from './components/VoltageChart.vue'
+import InlineMenuView from './components/InlineMenuView.vue'
 
 export default {
   name: 'App',
@@ -45,41 +55,14 @@ export default {
     StatusHeader,
     ControlPanel,
     VoltageChart,
+    InlineMenuView
   },
   data() {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
     return {
-      // Datos del menú para la barra lateral
-      menu: [
-        {
-          header: 'Main Navigation',
-          hiddenOnCollapse: true,
-        },
-        {
-          href: '/',
-          title: 'Dashboard',
-          icon: 'fa fa-tachometer-alt',
-        },
-        {
-          href: '/sensors',
-          title: 'Sensores',
-          icon: 'fa fa-cogs',
-          child: [
-            {
-              href: '/sensors/list',
-              title: 'Lista de Sensores',
-            },
-            {
-              href: '/sensors/settings',
-              title: 'Configuración',
-            },
-          ],
-        },
-        {
-          href: '/settings',
-          title: 'Ajustes',
-          icon: 'fa fa-cog',
-        },
-      ],
       sensorId: 1,
       selectedEndpoint: 'local',
       externalUrl: 'https://b18811412a85.ngrok-free.app',
@@ -91,12 +74,25 @@ export default {
       error: null,
       lastUpdate: 'Nunca',
       isOnline: false,
-      intervalId: null, // Definición única
-      targetTimezone: 'America/Los_Angeles' // Definición única
+      intervalId: null,
+      targetTimezone: 'America/Los_Angeles',
+      startDate: yesterday.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0],
+    }
+  },
+  computed: {
+    minMaxVoltages() {
+      if (!this.chartData || this.chartData.length === 0) {
+        return { min: null, max: null };
+      }
+      const voltages = this.chartData.map(point => point.value);
+      const min = Math.min(...voltages);
+      const max = Math.max(...voltages);
+      return { min, max };
     }
   },
   mounted() {
-    this.fetchData()
+    this.fetchData();
     this.startAutoUpdate(); 
   },
   beforeUnmount() {
@@ -106,6 +102,10 @@ export default {
     handleEndpointUpdate(endpoint) {
       this.selectedEndpoint = endpoint
       this.updateApiUrl()
+      if (this.autoUpdate) {
+        this.stopAutoUpdate();
+        this.startAutoUpdate();
+      }
     },
 
     handleExternalUrlUpdate(url) {
@@ -113,12 +113,33 @@ export default {
       if (this.selectedEndpoint === 'external') {
         this.updateApiUrl()
       }
+      if (this.autoUpdate && this.selectedEndpoint === 'external') {
+        this.stopAutoUpdate();
+        this.startAutoUpdate();
+      }
     },
 
     handleSensorIdUpdate(id) {
       this.sensorId = id
       if (this.autoUpdate) {
-        this.fetchData()
+        this.stopAutoUpdate();
+        this.startAutoUpdate();
+      }
+      this.fetchData(); 
+    },
+
+    handleStartDateUpdate(date) {
+      this.startDate = date;
+    },
+    handleEndDateUpdate(date) {
+      this.endDate = date;
+    },
+
+    toggleAutoUpdate() {
+      if (this.autoUpdate) {
+        this.stopAutoUpdate()
+      } else {
+        this.startAutoUpdate()
       }
     },
 
@@ -135,14 +156,11 @@ export default {
       this.error = null
 
       try {
-        const url = `${this.apiUrl}/${this.sensorId}/recent`
-        console.log('Fetching from:', url)
-        
+        let url = `${this.apiUrl}/${this.sensorId}/recent`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            // 'Content-Type': 'application/json' - Eliminado, no necesario para GET
           },
         })
 
@@ -168,6 +186,9 @@ export default {
             this.currentVoltage = data.readings[0].voltage
             const mostRecentReading = data.readings[0]
             this.lastUpdate = this.formatTimestampForDisplay(mostRecentReading.timestamp)
+          } else {
+            this.currentVoltage = null;
+            this.lastUpdate = 'No hay datos recientes';
           }
         } else {
           throw new Error('Formato de datos inválido')
@@ -182,9 +203,6 @@ export default {
       }
     },
 
-    /**
-     * Format a timestamp string for display, preserving the original timezone
-     */
     formatTimestampForDisplay(timestampString) {
       try {
         const date = new Date(timestampString)
@@ -200,9 +218,6 @@ export default {
       }
     },
 
-    /**
-     * Convert timestamp to Unix timestamp for chart, preserving timezone context
-     */
     timestampToUnix(timestampString) {
       try {
         const date = new Date(timestampString)
@@ -232,9 +247,10 @@ export default {
 
     startAutoUpdate() {
       this.autoUpdate = true
+      this.fetchData();
       this.intervalId = setInterval(() => {
         this.fetchData()
-      }, 5000) // 5 seconds
+      }, 5000)
     },
 
     stopAutoUpdate() {
@@ -247,3 +263,4 @@ export default {
   }
 }
 </script>
+```

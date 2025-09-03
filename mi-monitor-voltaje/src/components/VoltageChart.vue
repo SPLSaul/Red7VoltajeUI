@@ -121,12 +121,12 @@ export default {
 <style scoped>
 .chart-container {
   padding: 30px;
-    background: rgb(3, 3, 3);
+    background: rgb(0, 0, 0);
 
 }
 
 .chart-wrapper {
-  background: rgb(3, 3, 3);
+  background: rgb(0, 0, 0);
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   overflow: hidden;
