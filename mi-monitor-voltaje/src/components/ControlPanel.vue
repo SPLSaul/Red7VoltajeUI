@@ -42,7 +42,6 @@ export default {
     'update-endpoint',
     'update-external-url', 
     'update-sensor-id',
-    'toggle-auto-update',
     'fetch-data'
   ]
 }
