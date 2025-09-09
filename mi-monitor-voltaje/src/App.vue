@@ -6,9 +6,20 @@
       :lastUpdate="lastUpdate"
     />
     
-    <ControlPanel 
+
+
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
+
+    <VoltageChart 
+      :chartData="chartData"
+      :currentVoltage="currentVoltage"
+      :loading="loading && !chartData.length"
+    />
+        <ControlPanel 
+      :apiUrl="apiUrl"
       :selectedEndpoint="selectedEndpoint"
-      :externalUrl="externalUrl"
       :sensorId="sensorId"
       :autoUpdate="autoUpdate"
       :loading="loading"
@@ -21,17 +32,15 @@
       @fetch-data="fetchData"
       @update-start-date="handleStartDateUpdate" 
       @update-end-date="handleEndDateUpdate"   
-      @apply-date-filter="fetchData" 
+      @apply-date-filter="fetchDataWithRange"
     />
 
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
+        <VoltageChart 
+      :chartData="rangeChartData"
+      :currentVoltage="null"
+      :loading="loading && !rangeChartData.length"
+        title="Voltaje filtrado por rango"
 
-    <VoltageChart 
-      :chartData="chartData"
-      :currentVoltage="currentVoltage"
-      :loading="loading && !chartData.length"
     />
     
     <!-- Componente del menú expandible -->
@@ -68,6 +77,7 @@ export default {
       externalUrl: 'https://b18811412a85.ngrok-free.app',
       apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
+       rangeChartData: [],   
       currentVoltage: null,
       autoUpdate: true,
       loading: false,
@@ -259,7 +269,66 @@ export default {
         clearInterval(this.intervalId)
         this.intervalId = null
       }
+    },
+
+
+async fetchDataWithRange() {
+  this.rangeLoading = true; // Usar rangeLoading en lugar de loading general
+  this.error = null;
+
+  try {
+    // Asegurar que las fechas tengan formato completo con hora
+    const formattedStartDate = this.startDate.includes(' ') ? this.startDate : `${this.startDate} 00:00`;
+    const formattedEndDate = this.endDate.includes(' ') ? this.endDate : `${this.endDate} 23:59`;
+    
+    // Codificar correctamente los parámetros
+    const url = `${this.apiUrl}/${this.sensorId}/range?start_date=${encodeURIComponent(formattedStartDate)}&end_date=${encodeURIComponent(formattedEndDate)}&limit=100`;
+    
+    console.log('Fetching range data from:', url); // Para debugging
+    
+    const response = await fetch(url, { 
+      headers: { 'Accept': 'application/json' } 
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}. Response: ${errorText}`);
     }
+
+    const data = await response.json();
+    console.log('Range data received:', data); // Para debugging
+
+    if (data.readings && Array.isArray(data.readings)) {
+      // Procesar datos correctamente
+      this.rangeChartData = data.readings
+        .map(r => ({
+          time: this.timestampToUnix(r.timestamp),
+          value: r.voltage,
+          originalTimestamp: r.timestamp // Mantener para referencia
+        }))
+        .sort((a, b) => a.time - b.time); // Ordenar cronológicamente
+
+      console.log('Processed range chart data:', this.rangeChartData);
+      this.isOnline = true;
+    } else if (data.readings === undefined) {
+      // Si no hay datos pero la respuesta es válida
+      this.rangeChartData = [];
+      console.log('No readings found in the specified range');
+    } else {
+      throw new Error('Formato de datos inválido: la propiedad readings no es un array');
+    }
+
+  } catch (error) {
+    console.error('Error fetching data with range:', error);
+    this.error = `Error al obtener datos por rango: ${error.message}`;
+    this.isOnline = false;
+    
+    // Limpiar datos en caso de error
+    this.rangeChartData = [];
+  } finally {
+    this.rangeLoading = false;
+  }
+}
   }
 }
 </script>

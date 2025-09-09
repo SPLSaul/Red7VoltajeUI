@@ -20,3 +20,22 @@ Port 3000 is in use, trying another one...
   ➜  Local:   http://localhost:3001/
   ➜  Network: http://192.168.165.96:3001/
   ➜  Network: http://172.17.0.1:3001/
+
+> mi-monitor-voltaje@0.0.0 dev
+> vite /
+
+
+  VITE v7.1.3  ready in 486 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+> mi-monitor-voltaje@0.0.0 dev
+> vite
+
+
+  VITE v7.1.3  ready in 1429 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://192.166.0.254:3000/
+  ➜  Network: http://172.17.0.1:3000/

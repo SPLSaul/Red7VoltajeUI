@@ -1,7 +1,5 @@
 * {
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
 }
 
 body {
@@ -10,6 +8,11 @@ body {
 }
 
 
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #000000 0%, #000000 100%);
+  color: white; /* 👈 Esto asegura que TODO el texto sea blanco por defecto */
+}
 
 .btn {
   background: linear-gradient(135deg, #3498db, #2980b9);
