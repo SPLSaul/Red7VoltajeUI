@@ -28,20 +28,31 @@
       </div>
     </div>
 
-    <!-- Boton para enviar -->
-    <button
-      @click="fetchSensorData"
-      :disabled="componentLoading"
-      class="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-    >
-      {{ componentLoading ? 'Buscando...' : 'Buscar datos' }}
-    </button>
+    <!-- Botones de acción -->
+    <div class="flex gap-2 flex-wrap">
+      <button
+        @click="fetchSensorData"
+        :disabled="componentLoading"
+        class="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+      >
+        {{ componentLoading ? 'Buscando...' : 'Buscar datos' }}
+      </button>
+
+      <button
+        @click="downloadCSV"
+        :disabled="!results || results.count === 0 || csvLoading"
+        class="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+      >
+        {{ csvLoading ? 'Descargando...' : 'Descargar CSV' }}
+      </button>
+    </div>
 
     <!-- Resultados -->
     <div v-if="results" class="mt-3 p-2 bg-green-100 rounded text-sm">
       <h3 class="text-sm font-semibold text-gray-900">Resultados encontrados:</h3>
       <p class="text-gray-700"><strong>Sensor ID:</strong> {{ results.sensor_id }}</p>
-      <p class="text-gray-700"><strong>Registros:</strong> {{ results.count }}</p>
+      <p class="text-gray-700"><strong>Registros:</strong> {{ results.count }} (límite: 1000)</p>
+      <p class="text-gray-700"><strong>Rango:</strong> {{ formatDisplayDate(results.start_date) }} - {{ formatDisplayDate(results.end_date) }}</p>
     </div>
   </div>
 </template>
@@ -73,11 +84,11 @@ const localStartDate = ref(null)
 const localEndDate = ref(null)
 const results = ref(null)
 const componentLoading = ref(false)
+const csvLoading = ref(false)
 
 // Sync parent's date props to local
 onMounted(() => {
   if (props.startDate) {
-    // Convertir el formato YYYY-MM-DD a objeto Date con hora
     localStartDate.value = new Date(props.startDate + 'T00:00:00')
   }
   if (props.endDate) {
@@ -130,7 +141,7 @@ const fetchSensorData = async () => {
       params: {
         start_date: formattedStartDate,
         end_date: formattedEndDate,
-        limit: 100
+        limit: 1000
       }
     })
     
@@ -154,6 +165,104 @@ const fetchSensorData = async () => {
   }
 }
 
+const downloadCSV = async () => {
+  if (!localStartDate.value || !localEndDate.value) {
+    alert("Debes seleccionar ambas fechas primero")
+    return
+  }
+
+  csvLoading.value = true
+
+  try {
+    const formattedStartDate = formatDateForAPI(localStartDate.value)
+    const formattedEndDate = formatDateForAPI(localEndDate.value)
+    
+    console.log("=== PETICIÓN CSV ===")
+    console.log("Params:", {
+      start_date: formattedStartDate,
+      end_date: formattedEndDate,
+      limit: 1000
+    })
+    
+    const res = await axios.get(`${props.apiUrl}/${props.sensorId}/range`, {
+      params: {
+        start_date: formattedStartDate,
+        end_date: formattedEndDate,
+        limit: 1000
+      },
+      headers: {
+        'Accept': 'text/csv'
+      },
+      responseType: 'blob'
+    })
+    
+    console.log("✅ CSV descargado, tamaño:", res.data.size)
+    
+    // Crear URL del blob y descargar
+    const blob = new Blob([res.data], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    
+    const startStr = formattedStartDate.replace(/[: ]/g, '-')
+    const endStr = formattedEndDate.replace(/[: ]/g, '-')
+    const filename = `sensor_${props.sensorId}_${startStr}_to_${endStr}.csv`
+    
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    console.log("✅ CSV descargado exitosamente")
+    
+  } catch (err) {
+    console.error("❌ Error descargando CSV:", err)
+    
+    // 🔍 LEER EL CONTENIDO DEL BLOB DE ERROR
+    if (err.response?.data instanceof Blob) {
+      try {
+        const errorText = await err.response.data.text()
+        console.error("📄 Contenido completo del error:", errorText)
+        
+        // Intentar parsear como JSON
+        try {
+          const errorJson = JSON.parse(errorText)
+          console.error("📊 Error parseado:", errorJson)
+          
+          if (errorJson.detail) {
+            if (Array.isArray(errorJson.detail)) {
+              // Si es un array de errores de validación
+              const errorMessages = errorJson.detail.map(d => 
+                `${d.loc ? d.loc.join('.') + ': ' : ''}${d.msg}`
+              ).join('\n')
+              alert(`Errores de validación:\n${errorMessages}`)
+            } else {
+              // Si es un string simple
+              alert(`Error: ${errorJson.detail}`)
+            }
+          } else {
+            alert(`Error del servidor: ${JSON.stringify(errorJson)}`)
+          }
+        } catch (parseError) {
+          // Si no es JSON, mostrar el texto plano
+          console.error("El error no es JSON:", errorText)
+          alert(`Error: ${errorText}`)
+        }
+      } catch (blobError) {
+        console.error("Error leyendo el blob:", blobError)
+        alert('Error desconocido al procesar la respuesta del servidor')
+      }
+    } else {
+      const errorMsg = err.response?.data?.detail || err.message
+      alert(`Error al descargar CSV: ${errorMsg}`)
+    }
+    emit('error', err)
+  } finally {
+    csvLoading.value = false
+  }
+}
+
 // Formatear fecha para la API (formato: YYYY-MM-DD HH:MM)
 const formatDateForAPI = (date) => {
   const pad = (n) => (n < 10 ? "0" + n : n)
@@ -173,6 +282,19 @@ const formatDateToYYYYMMDD = (date) => {
   const mm = pad(date.getMonth() + 1)
   const dd = pad(date.getDate())
   return `${yyyy}-${mm}-${dd}`
+}
+
+// Formatear fecha para mostrar en resultados
+const formatDisplayDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleString('es-MX', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 </script>
 
