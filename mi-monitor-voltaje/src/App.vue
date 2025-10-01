@@ -6,8 +6,6 @@
       :lastUpdate="lastUpdate"
     />
     
-
-
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
@@ -16,8 +14,10 @@
       :chartData="chartData"
       :currentVoltage="currentVoltage"
       :loading="loading && !chartData.length"
+      title="Datos en Tiempo Real"
     />
-        <ControlPanel 
+    
+    <ControlPanel 
       :apiUrl="apiUrl"
       :selectedEndpoint="selectedEndpoint"
       :sensorId="sensorId"
@@ -33,22 +33,22 @@
       @update-start-date="handleStartDateUpdate" 
       @update-end-date="handleEndDateUpdate"   
       @apply-date-filter="fetchDataWithRange"
+      @update-filtered-readings="handleFilteredReadings" 
     />
 
-        <VoltageChart 
+    <!-- Gráfico filtrado por fecha -->
+    <VoltageChart 
+      v-if="showChart && rangeChartData.length > 0"
       :chartData="rangeChartData"
       :currentVoltage="null"
-      :loading="loading && !rangeChartData.length"
-        title="Voltaje filtrado por rango"
-
+      :loading="rangeLoading"
+      title="Voltaje filtrado por rango"
     />
     
-    <!-- Componente del menú expandible -->
     <InlineMenuView 
       :minVoltage="minMaxVoltages.min"
       :maxVoltage="minMaxVoltages.max"
     />
-
   </div>
 </template>
 
@@ -77,10 +77,11 @@ export default {
       externalUrl: 'https://b18811412a85.ngrok-free.app',
       apiUrl: import.meta.env.VITE_API_URL, 
       chartData: [],
-       rangeChartData: [],   
+      rangeChartData: [],   
       currentVoltage: null,
       autoUpdate: true,
       loading: false,
+      rangeLoading: false,
       error: null,
       lastUpdate: 'Nunca',
       isOnline: false,
@@ -88,6 +89,7 @@ export default {
       targetTimezone: 'America/Los_Angeles',
       startDate: yesterday.toISOString().split('T')[0],
       endDate: today.toISOString().split('T')[0],
+      showChart: false, 
     }
   },
   computed: {
@@ -109,6 +111,34 @@ export default {
     this.stopAutoUpdate()
   },
   methods: {
+    // ✅ NUEVO MÉTODO PARA MANEJAR LOS DATOS FILTRADOS
+    handleFilteredReadings(filteredReadings) {
+      console.log('Datos filtrados recibidos en App.vue:', filteredReadings);
+      
+      if (filteredReadings && Array.isArray(filteredReadings)) {
+        this.rangeChartData = this.processReadingsForChart(filteredReadings);
+        this.showChart = true;
+        this.rangeLoading = false;
+        
+        console.log('Gráfico filtrado actualizado con:', this.rangeChartData.length, 'puntos');
+      } else {
+        this.rangeChartData = [];
+        this.showChart = false;
+      }
+    },
+
+    // ✅ MÉTODO PARA PROCESAR LECTURAS PARA EL GRÁFICO
+    processReadingsForChart(readings) {
+      return readings
+        .map(reading => ({
+          time: this.timestampToUnix(reading.timestamp),
+          value: reading.voltage,
+          originalTimestamp: reading.timestamp
+        }))
+        .sort((a, b) => a.time - b.time);
+    },
+
+    // Los demás métodos permanecen igual...
     handleEndpointUpdate(endpoint) {
       this.selectedEndpoint = endpoint
       this.updateApiUrl()
@@ -141,6 +171,7 @@ export default {
     handleStartDateUpdate(date) {
       this.startDate = date;
     },
+    
     handleEndDateUpdate(date) {
       this.endDate = date;
     },
@@ -271,65 +302,60 @@ export default {
       }
     },
 
+    async fetchDataWithRange() {
+      this.rangeLoading = true;
+      this.error = null;
 
-async fetchDataWithRange() {
-  this.rangeLoading = true; // Usar rangeLoading en lugar de loading general
-  this.error = null;
+      try {
+        const formattedStartDate = this.startDate.includes(' ') ? this.startDate : `${this.startDate} 00:00`;
+        const formattedEndDate = this.endDate.includes(' ') ? this.endDate : `${this.endDate} 23:59`;
+        
+        const url = `${this.apiUrl}/${this.sensorId}/range?start_date=${encodeURIComponent(formattedStartDate)}&end_date=${encodeURIComponent(formattedEndDate)}&limit=100`;
+        
+        console.log('Fetching range data from:', url);
+        
+        const response = await fetch(url, { 
+          headers: { 'Accept': 'application/json' } 
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Error HTTP: ${response.status} - ${response.statusText}. Response: ${errorText}`);
+        }
 
-  try {
-    // Asegurar que las fechas tengan formato completo con hora
-    const formattedStartDate = this.startDate.includes(' ') ? this.startDate : `${this.startDate} 00:00`;
-    const formattedEndDate = this.endDate.includes(' ') ? this.endDate : `${this.endDate} 23:59`;
-    
-    // Codificar correctamente los parámetros
-    const url = `${this.apiUrl}/${this.sensorId}/range?start_date=${encodeURIComponent(formattedStartDate)}&end_date=${encodeURIComponent(formattedEndDate)}&limit=100`;
-    
-    console.log('Fetching range data from:', url); // Para debugging
-    
-    const response = await fetch(url, { 
-      headers: { 'Accept': 'application/json' } 
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}. Response: ${errorText}`);
+        const data = await response.json();
+        console.log('Range data received:', data);
+
+        if (data.readings && Array.isArray(data.readings)) {
+          this.rangeChartData = data.readings
+            .map(r => ({
+              time: this.timestampToUnix(r.timestamp),
+              value: r.voltage,
+              originalTimestamp: r.timestamp
+            }))
+            .sort((a, b) => a.time - b.time);
+
+          console.log('Processed range chart data:', this.rangeChartData);
+          this.isOnline = true;
+          this.showChart = true;
+        } else if (data.readings === undefined) {
+          this.rangeChartData = [];
+          this.showChart = false;
+          console.log('No readings found in the specified range');
+        } else {
+          throw new Error('Formato de datos inválido: la propiedad readings no es un array');
+        }
+
+      } catch (error) {
+        console.error('Error fetching data with range:', error);
+        this.error = `Error al obtener datos por rango: ${error.message}`;
+        this.isOnline = false;
+        this.rangeChartData = [];
+        this.showChart = false;
+      } finally {
+        this.rangeLoading = false;
+      }
     }
-
-    const data = await response.json();
-    console.log('Range data received:', data); // Para debugging
-
-    if (data.readings && Array.isArray(data.readings)) {
-      // Procesar datos correctamente
-      this.rangeChartData = data.readings
-        .map(r => ({
-          time: this.timestampToUnix(r.timestamp),
-          value: r.voltage,
-          originalTimestamp: r.timestamp // Mantener para referencia
-        }))
-        .sort((a, b) => a.time - b.time); // Ordenar cronológicamente
-
-      console.log('Processed range chart data:', this.rangeChartData);
-      this.isOnline = true;
-    } else if (data.readings === undefined) {
-      // Si no hay datos pero la respuesta es válida
-      this.rangeChartData = [];
-      console.log('No readings found in the specified range');
-    } else {
-      throw new Error('Formato de datos inválido: la propiedad readings no es un array');
-    }
-
-  } catch (error) {
-    console.error('Error fetching data with range:', error);
-    this.error = `Error al obtener datos por rango: ${error.message}`;
-    this.isOnline = false;
-    
-    // Limpiar datos en caso de error
-    this.rangeChartData = [];
-  } finally {
-    this.rangeLoading = false;
-  }
-}
   }
 }
 </script>
-```

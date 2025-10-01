@@ -47,13 +47,13 @@
       </button>
     </div>
 
-    <!-- Resultados -->
-    <div v-if="results" class="mt-3 p-2 bg-green-100 rounded text-sm">
-      <h3 class="text-sm font-semibold text-gray-900">Resultados encontrados:</h3>
-      <p class="text-gray-700"><strong>Sensor ID:</strong> {{ results.sensor_id }}</p>
-      <p class="text-gray-700"><strong>Registros:</strong> {{ results.count }} (límite: 1000)</p>
-      <p class="text-gray-700"><strong>Rango:</strong> {{ formatDisplayDate(results.start_date) }} - {{ formatDisplayDate(results.end_date) }}</p>
+    <!-- Información de resultados -->
+    <div v-if="results" class="results-info">
+      <p class="text-sm text-gray-600">
+        Se encontraron <strong>{{ results.count }}</strong> lecturas
+      </p>
     </div>
+
   </div>
 </template>
 
@@ -77,7 +77,8 @@ const emit = defineEmits([
   'error', 
   'update-start-date', 
   'update-end-date',
-  'apply-date-filter'
+  'apply-date-filter',
+  'update-filtered-readings' 
 ])
 
 const localStartDate = ref(null)
@@ -145,11 +146,14 @@ const fetchSensorData = async () => {
       }
     })
     
-    console.log("Respuesta API:", res.data)
+    console.log("Datos filtrados obtenidos:", res.data)
+    
+    // ✅ GUARDAR LOS RESULTADOS PARA HABILITAR EL BOTÓN DESCARGAR CSV
     results.value = res.data
     
+    // ✅ EMITIR LOS DATOS FILTRADOS AL PADRE PARA MOSTRAR EL GRÁFICO
     if (res.data.readings && Array.isArray(res.data.readings)) {
-      emit('update:readings', res.data.readings)
+      emit('update-filtered-readings', res.data.readings)
     }
     
     // Emitir evento para que el padre sepa que se aplicó el filtro
@@ -160,6 +164,7 @@ const fetchSensorData = async () => {
     const errorMsg = `Error al obtener los datos del sensor: ${err.response?.data?.detail || err.message}`
     alert(errorMsg)
     emit('error', errorMsg)
+    results.value = null // ✅ LIMPIAR RESULTADOS EN CASO DE ERROR
   } finally {
     componentLoading.value = false
   }
@@ -306,6 +311,10 @@ const formatDisplayDate = (dateString) => {
 .datepicker-container {
   width: 25%;
   min-width: 200px;
+}
+
+.results-info {
+  @apply p-2 bg-gray-50 rounded border text-sm;
 }
 
 :deep(.dp__theme_light) {
