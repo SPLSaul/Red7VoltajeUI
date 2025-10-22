@@ -4,6 +4,8 @@
       :isOnline="isOnline"
       :sensorId="sensorId"
       :lastUpdate="lastUpdate"
+      :api-base-url="getApiBaseUrl"
+      @sensor-change="handleSensorIdUpdate"
     />
     
     <div v-if="error" class="error-message">
@@ -101,6 +103,13 @@ export default {
       const min = Math.min(...voltages);
       const max = Math.max(...voltages);
       return { min, max };
+    },
+     getApiBaseUrl() {
+      if (this.selectedEndpoint === 'local') {
+        return import.meta.env.VITE_API_URL?.replace('/api/v1/sensor_data', '/api/v1') || 'http://192.166.0.254:8000/api/v1'
+      } else {
+        return this.externalUrl.replace('/api/v1/sensor_data', '/api/v1')
+      }
     }
   },
   mounted() {

@@ -211,3 +211,13 @@ Port 3000 is in use, trying another one...
       at createDescriptor (file:///home/desarrollo/Red7VoltajeUI/mi-monitor-voltaje/node_modules/@vitejs/plugin-vue/dist/index.js:79:42)
       at handleHotUpdate (file:///home/desarrollo/Red7VoltajeUI/mi-monitor-voltaje/node_modules/@vitejs/plugin-vue/dist/index.js:1475:25)
 1:25:37 PM [vite] (client) hmr update /src/App.vue
+
+> mi-monitor-voltaje@0.0.0 dev
+> vite
+
+
+  VITE v7.1.3  ready in 1528 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://192.166.0.254:3000/
+  ➜  Network: http://172.17.0.1:3000/
