@@ -19,7 +19,7 @@
           v-model="selectedSensor"
           @change="handleSensorChange"
           :disabled="loading"
-          class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-gray-800"
+          class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-gray-800 mb-2"
         >
           <option value="" disabled>{{ loading ? 'Cargando sensores...' : 'Selecciona un sensor' }}</option>
           <option 
@@ -29,9 +29,71 @@
           >
             Sensor {{ sensor.sensor_id }} - {{ sensor.descripcion || sensor.sensor_type }} ({{ sensor.location }})
           </option>
+          <option value="new" class="text-blue-600 font-semibold">
+            + Agregar nuevo sensor
+          </option>
         </select>
+
+        <!-- Formulario para nuevo sensor (se muestra cuando se selecciona "Agregar nuevo sensor") -->
+        <div v-if="showNewSensorForm" class="new-sensor-form bg-white p-3 rounded-lg shadow-md mt-2">
+          <h3 class="text-sm font-semibold text-gray-800 mb-2">Agregar Nuevo Sensor</h3>
+          
+          <div class="space-y-2">
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Tipo de Sensor</label>
+              <input
+                v-model="newSensor.sensor_type"
+                type="text"
+                placeholder="Ej: ESP32, Medicion, etc."
+                class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Descripción</label>
+              <input
+                v-model="newSensor.description"
+                type="text"
+                placeholder="Ej: Testing, Medidor principal, etc."
+                class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Ubicación</label>
+              <input
+                v-model="newSensor.location"
+                type="text"
+                placeholder="Ej: Ucallz, Laboratorio, etc."
+                class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <!-- Botones del formulario -->
+          <div class="flex gap-2 mt-3">
+            <button
+              @click="createNewSensor"
+              :disabled="creatingSensor"
+              class="flex-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition disabled:opacity-50"
+            >
+              {{ creatingSensor ? 'Creando...' : 'Crear Sensor' }}
+            </button>
+            <button
+              @click="cancelNewSensor"
+              class="flex-1 px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          <!-- Mensaje de error/éxito -->
+          <div v-if="newSensorMessage" :class="['text-xs mt-2 p-2 rounded', newSensorMessage.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700']">
+            {{ newSensorMessage.text }}
+          </div>
+        </div>
         
-        <!-- Mensaje de error -->
+        <!-- Mensaje de error general -->
         <div v-if="error" class="text-red-300 text-xs mt-1">
           {{ error }}
         </div>
@@ -74,11 +136,18 @@ export default {
       sensors: [],
       selectedSensor: this.sensorId,
       loading: false,
-      error: ''
+      error: '',
+      showNewSensorForm: false,
+      creatingSensor: false,
+      newSensor: {
+        sensor_type: '',
+        description: '',
+        location: ''
+      },
+      newSensorMessage: null
     }
   },
   watch: {
-    // Actualizar selectedSensor cuando el prop sensorId cambie desde el padre
     sensorId(newVal) {
       if (newVal !== this.selectedSensor) {
         this.selectedSensor = newVal
@@ -100,7 +169,6 @@ export default {
         console.log('Sensores obtenidos:', response.data)
         this.sensors = response.data
         
-        // Si el sensorId actual no está en la lista, seleccionar el primero
         const currentSensorExists = this.sensors.some(sensor => sensor.sensor_id === this.selectedSensor)
         if (!currentSensorExists && this.sensors.length > 0) {
           this.selectedSensor = this.sensors[0].sensor_id
@@ -116,8 +184,96 @@ export default {
     },
     
     handleSensorChange() {
-      console.log('Sensor seleccionado:', this.selectedSensor)
-      this.$emit('sensor-change', parseInt(this.selectedSensor))
+      if (this.selectedSensor === 'new') {
+        // Mostrar formulario para nuevo sensor
+        this.showNewSensorForm = true
+        this.newSensorMessage = null
+      } else {
+        // Sensor normal seleccionado
+        this.showNewSensorForm = false
+        this.newSensorMessage = null
+        console.log('Sensor seleccionado:', this.selectedSensor)
+        this.$emit('sensor-change', parseInt(this.selectedSensor))
+      }
+    },
+
+    async createNewSensor() {
+      // Validar campos requeridos
+      if (!this.newSensor.sensor_type.trim() || !this.newSensor.description.trim() || !this.newSensor.location.trim()) {
+        this.newSensorMessage = {
+          type: 'error',
+          text: 'Todos los campos son requeridos'
+        }
+        return
+      }
+
+      this.creatingSensor = true
+      this.newSensorMessage = null
+
+      try {
+        const response = await axios.post(`${this.apiBaseUrl}/sensors`, {
+          sensor_type: this.newSensor.sensor_type,
+          description: this.newSensor.description,
+          location: this.newSensor.location
+        }, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        })
+
+        console.log('Nuevo sensor creado:', response.data)
+        
+        // Mostrar mensaje de éxito
+        this.newSensorMessage = {
+          type: 'success',
+          text: `Sensor creado exitosamente! ID: ${response.data.sensor_id}`
+        }
+
+        // Limpiar formulario
+        this.newSensor = {
+          sensor_type: '',
+          description: '',
+          location: ''
+        }
+
+        // Recargar lista de sensores después de un breve delay
+        setTimeout(() => {
+          this.fetchSensors().then(() => {
+            // Seleccionar el nuevo sensor automáticamente
+            if (response.data.sensor_id) {
+              this.selectedSensor = response.data.sensor_id
+              this.showNewSensorForm = false
+              this.$emit('sensor-change', response.data.sensor_id)
+            }
+          })
+        }, 1500)
+
+      } catch (err) {
+        console.error('Error creando sensor:', err)
+        this.newSensorMessage = {
+          type: 'error',
+          text: `Error al crear sensor: ${err.response?.data?.detail || err.message}`
+        }
+      } finally {
+        this.creatingSensor = false
+      }
+    },
+
+    cancelNewSensor() {
+      this.showNewSensorForm = false
+      this.newSensorMessage = null
+      // Restaurar selección anterior o primera opción
+      if (this.sensors.length > 0) {
+        this.selectedSensor = this.sensors[0].sensor_id
+      } else {
+        this.selectedSensor = ''
+      }
+      this.newSensor = {
+        sensor_type: '',
+        description: '',
+        location: ''
+      }
     }
   },
   mounted() {
@@ -162,7 +318,7 @@ export default {
 }
 
 .sensor-selector-container {
-  min-width: 250px;
+  min-width: 300px;
 }
 
 .status-dot {
@@ -178,6 +334,10 @@ export default {
 
 .status-offline {
   background-color: #e74c3c;
+}
+
+.new-sensor-form {
+  border: 1px solid #e2e8f0;
 }
 
 @keyframes pulse {
@@ -203,6 +363,10 @@ export default {
   }
 
   .status-item {
+    min-width: 100%;
+  }
+
+  .sensor-selector-container {
     min-width: 100%;
   }
 }
