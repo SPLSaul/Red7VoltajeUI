@@ -1,6 +1,6 @@
 <template>
   <div class="p-3 bg-white rounded-lg shadow-md space-y-3 w-full max-w-full">
-    <h2 class="text-base font-semibold text-gray-900">Consultar lecturas del sensor</h2>
+    <h2 class="text-base font-semibold text-gray-900">Consultar lecturas del sensores</h2>
 
     <!-- Intervalos rápidos -->
     <div class="quick-intervals">
@@ -253,6 +253,7 @@ const calculateDataLimit = (diffDays) => {
   return 200000                        // Más de 7 días: 200k puntos
 }
 
+
 const downloadCSV = async () => {
   if (!localStartDate.value || !localEndDate.value) {
     alert("Debes seleccionar ambas fechas primero")
@@ -281,7 +282,8 @@ const downloadCSV = async () => {
       params: {
         start_date: formattedStartDate,
         end_date: formattedEndDate,
-        limit: dataLimit
+        limit: dataLimit,
+        max_rows_per_csv: 150000  // 👈 Máximo de filas por archivo CSV
       },
       headers: {
         'Accept': 'text/csv'
@@ -289,16 +291,43 @@ const downloadCSV = async () => {
       responseType: 'blob'
     })
     
-    console.log("✅ CSV descargado, tamaño:", res.data.size)
+    // 📊 Leer los headers de respuesta para saber si es ZIP o CSV
+    const contentType = res.headers['content-type']
+    const totalRecords = res.headers['x-total-records']
+    const totalFiles = res.headers['x-total-files']
+    const rowsPerFile = res.headers['x-rows-per-file']
     
-    // Crear URL del blob y descargar
-    const blob = new Blob([res.data], { type: 'text/csv' })
+    console.log("✅ Respuesta recibida:", {
+      contentType,
+      size: res.data.size,
+      totalRecords,
+      totalFiles,
+      rowsPerFile
+    })
+    
+    // 🎯 Determinar si es CSV único o ZIP con múltiples archivos
+    const isZip = contentType === 'application/zip'
+    const filename = isZip 
+      ? `sensor_${props.sensorId}_export_${formatDateForFilename(formattedStartDate)}_to_${formatDateForFilename(formattedEndDate)}.zip`
+      : `sensor_${props.sensorId}_${formatDateForFilename(formattedStartDate)}_to_${formatDateForFilename(formattedEndDate)}.csv`
+    
+    // 📢 Notificar al usuario si son múltiples archivos
+    if (isZip && totalFiles) {
+      const message = `📦 Se descargará un ZIP con ${totalFiles} archivos CSV\n` +
+                      `Total de registros: ${parseInt(totalRecords).toLocaleString()}\n` +
+                      `(${rowsPerFile} filas por archivo)`
+      console.log(message)
+      
+      // Mostrar notificación no bloqueante
+      showNotification(message, 'info')
+    }
+    
+    // 💾 Crear URL del blob y descargar
+    const blob = new Blob([res.data], { 
+      type: isZip ? 'application/zip' : 'text/csv' 
+    })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    
-    const startStr = formattedStartDate.replace(/[: ]/g, '-')
-    const endStr = formattedEndDate.replace(/[: ]/g, '-')
-    const filename = `sensor_${props.sensorId}_${startStr}_to_${endStr}.csv`
     
     link.href = url
     link.setAttribute('download', filename)
@@ -307,7 +336,14 @@ const downloadCSV = async () => {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     
-    console.log("✅ CSV descargado exitosamente")
+    // ✅ Mensaje de éxito
+    if (isZip) {
+      console.log(`✅ ZIP descargado: ${filename} (${totalFiles} archivos CSV)`)
+      showNotification(`✅ Descarga completa: ${totalFiles} archivos CSV`, 'success')
+    } else {
+      console.log(`✅ CSV descargado: ${filename}`)
+      showNotification('✅ CSV descargado exitosamente', 'success')
+    }
     
   } catch (err) {
     console.error("❌ Error descargando CSV:", err)
@@ -354,6 +390,11 @@ const downloadCSV = async () => {
   } finally {
     csvLoading.value = false
   }
+}
+
+// 🆕 Función para formatear fecha en nombre de archivo (sin espacios ni dos puntos)
+const formatDateForFilename = (dateStr) => {
+  return dateStr.replace(/[: ]/g, '-')
 }
 
 // Formatear fecha para la API (formato: YYYY-MM-DD HH:MM)
