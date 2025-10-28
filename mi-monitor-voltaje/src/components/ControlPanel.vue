@@ -2,6 +2,21 @@
   <div class="p-3 bg-white rounded-lg shadow-md space-y-3 w-full max-w-full">
     <h2 class="text-base font-semibold text-gray-900">Consultar lecturas del sensor</h2>
 
+    <!-- Intervalos rápidos -->
+    <div class="quick-intervals">
+      <label class="block text-xs font-medium text-gray-700 mb-2">Intervalos rápidos:</label>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="interval in quickIntervals"
+          :key="interval.label"
+          @click="applyQuickInterval(interval)"
+          class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition border border-gray-300"
+        >
+          {{ interval.label }}
+        </button>
+      </div>
+    </div>
+
     <div class="flex gap-3 flex-wrap">
       <div class="w-25 datepicker-container"> 
         <label class="block text-xs font-medium text-gray-700">Fecha inicio</label>
@@ -26,6 +41,15 @@
           input-class-name="h-8 text-sm"
         />
       </div>
+    </div>
+
+    <!-- Información del intervalo -->
+    <div v-if="localStartDate && localEndDate" class="interval-info">
+      <p class="text-xs text-gray-600">
+        Intervalo seleccionado: <strong>{{ formatDisplayDate(localStartDate) }}</strong> hasta 
+        <strong>{{ formatDisplayDate(localEndDate) }}</strong>
+        <span v-if="estimatedPoints" class="ml-2">(≈ {{ estimatedPoints }} puntos)</span>
+      </p>
     </div>
 
     <!-- Botones de acción -->
@@ -53,12 +77,11 @@
         Se encontraron <strong>{{ results.count }}</strong> lecturas
       </p>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue"
+import { ref, watch, onMounted, computed } from "vue"
 import axios from "axios"
 import Datepicker from "@vuepic/vue-datepicker"
 import "@vuepic/vue-datepicker/dist/main.css"
@@ -86,6 +109,39 @@ const localEndDate = ref(null)
 const results = ref(null)
 const componentLoading = ref(false)
 const csvLoading = ref(false)
+
+
+// Calcular puntos estimados (5 segundos por dato = 12 puntos/minuto)
+const estimatedPoints = computed(() => {
+  if (!localStartDate.value || !localEndDate.value) return null
+  
+  const diffMs = localEndDate.value.getTime() - localStartDate.value.getTime()
+  const diffMinutes = diffMs / (1000 * 60)
+  const points = Math.floor(diffMinutes * 12) // 12 puntos por minuto
+  
+  return points > 1000 ? `${(points/1000).toFixed(1)}k` : points.toString()
+})
+
+// Aplicar intervalo rápido
+const applyQuickInterval = (interval) => {
+  const endDate = new Date() // Fecha/hora actual
+  const startDate = new Date(endDate)
+  
+  if (interval.minutes) {
+    startDate.setMinutes(endDate.getMinutes() - interval.minutes)
+  } else if (interval.days) {
+    startDate.setDate(endDate.getDate() - interval.days)
+  }
+  
+  localStartDate.value = startDate
+  localEndDate.value = endDate
+  
+  console.log(`Intervalo aplicado: ${interval.label}`, {
+    start: startDate,
+    end: endDate,
+    puntos_estimados: estimatedPoints.value
+  })
+}
 
 // Sync parent's date props to local
 onMounted(() => {
@@ -129,6 +185,20 @@ const fetchSensorData = async () => {
     return
   }
 
+  // Advertencia para intervalos muy grandes
+  const diffMs = localEndDate.value.getTime() - localStartDate.value.getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  
+  if (diffDays > 7) {
+    const points = estimatedPoints.value
+    const proceed = confirm(
+      `⚠️ El intervalo seleccionado es de aproximadamente ${Math.round(diffDays)} días.\n` +
+      `Esto generará ≈ ${points} puntos de datos.\n` +
+      `¿Desea continuar?`
+    )
+    if (!proceed) return
+  }
+
   componentLoading.value = true
   results.value = null
 
@@ -136,13 +206,17 @@ const fetchSensorData = async () => {
     const formattedStartDate = formatDateForAPI(localStartDate.value)
     const formattedEndDate = formatDateForAPI(localEndDate.value)
     
+    // Calcular límite dinámico según el intervalo
+    const dataLimit = calculateDataLimit(diffDays)
+    
     console.log("Fetching with dates:", formattedStartDate, formattedEndDate)
+    console.log("Límite calculado:", dataLimit, "puntos estimados:", estimatedPoints.value)
     
     const res = await axios.get(`${props.apiUrl}/${props.sensorId}/range`, {
       params: {
         start_date: formattedStartDate,
         end_date: formattedEndDate,
-        limit: 1000
+        limit: dataLimit
       }
     })
     
@@ -170,6 +244,15 @@ const fetchSensorData = async () => {
   }
 }
 
+// Calcular límite dinámico según el intervalo
+const calculateDataLimit = (diffDays) => {
+  if (diffDays <= 0.1) return 5000     // Hasta 2.4 horas: 5k puntos
+  if (diffDays <= 1) return 20000      // Hasta 1 día: 20k puntos
+  if (diffDays <= 3) return 50000      // Hasta 3 días: 50k puntos
+  if (diffDays <= 7) return 100000     // Hasta 7 días: 100k puntos
+  return 200000                        // Más de 7 días: 200k puntos
+}
+
 const downloadCSV = async () => {
   if (!localStartDate.value || !localEndDate.value) {
     alert("Debes seleccionar ambas fechas primero")
@@ -182,18 +265,23 @@ const downloadCSV = async () => {
     const formattedStartDate = formatDateForAPI(localStartDate.value)
     const formattedEndDate = formatDateForAPI(localEndDate.value)
     
+    // Calcular límite para CSV (usar el mismo cálculo dinámico)
+    const diffMs = localEndDate.value.getTime() - localStartDate.value.getTime()
+    const diffDays = diffMs / (1000 * 60 * 60 * 24)
+    const dataLimit = calculateDataLimit(diffDays)
+    
     console.log("=== PETICIÓN CSV ===")
     console.log("Params:", {
       start_date: formattedStartDate,
       end_date: formattedEndDate,
-      limit: 1000
+      limit: dataLimit
     })
     
     const res = await axios.get(`${props.apiUrl}/${props.sensorId}/range`, {
       params: {
         start_date: formattedStartDate,
         end_date: formattedEndDate,
-        limit: 1000
+        limit: dataLimit
       },
       headers: {
         'Accept': 'text/csv'
@@ -290,9 +378,8 @@ const formatDateToYYYYMMDD = (date) => {
 }
 
 // Formatear fecha para mostrar en resultados
-const formatDisplayDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
+const formatDisplayDate = (date) => {
+  if (!date) return ''
   return date.toLocaleString('es-MX', {
     year: 'numeric',
     month: '2-digit',
@@ -304,6 +391,14 @@ const formatDisplayDate = (dateString) => {
 </script>
 
 <style scoped>
+.quick-intervals {
+  margin-bottom: 1rem;
+}
+
+.interval-info {
+  @apply p-2 bg-blue-50 rounded border border-blue-200 text-sm;
+}
+
 .w-25 {
   width: 25% !important; 
 }

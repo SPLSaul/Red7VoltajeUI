@@ -268,16 +268,24 @@ export default {
       }
     },
 
-    timestampToUnix(timestampString) {
-      try {
-        const date = new Date(timestampString)
-        const timeWithOffset = date.getTime() - (date.getTimezoneOffset() * 60000)
-        return Math.floor(timeWithOffset / 1000)
-      } catch (error) {
-        console.error('Error converting timestamp:', error)
-        return 0
+  timestampToUnix(timestampString) {
+    try {
+      // Opción 1: Usar la zona horaria específica
+      const date = new Date(timestampString);
+      
+      // Ajustar a PDT (UTC-7) si el timestamp no tiene información de zona
+      if (!timestampString.endsWith('Z') && !timestampString.includes('+')) {
+        // Asumir que el timestamp está en America/Los_Angeles
+        const pdtOffset = -7 * 60 * 60 * 1000; // UTC-7 en milisegundos
+        return Math.floor((date.getTime() + pdtOffset) / 1000);
       }
-    },
+      
+      return Math.floor(date.getTime() / 1000);
+    } catch (error) {
+      console.error('Error converting timestamp:', error, timestampString);
+      return NaN;
+    }
+  },
 
     processData(readings) {
       const sortedReadings = [...readings].sort((a, b) => 
@@ -319,38 +327,25 @@ export default {
         const formattedStartDate = this.startDate.includes(' ') ? this.startDate : `${this.startDate} 00:00`;
         const formattedEndDate = this.endDate.includes(' ') ? this.endDate : `${this.endDate} 23:59`;
         
-        const url = `${this.apiUrl}/${this.sensorId}/range?start_date=${encodeURIComponent(formattedStartDate)}&end_date=${encodeURIComponent(formattedEndDate)}&limit=100`;
+        // Aumentar/eliminar limit o implementar paginación
+        const url = `${this.apiUrl}/${this.sensorId}/range?start_date=${encodeURIComponent(formattedStartDate)}&end_date=${encodeURIComponent(formattedEndDate)}&limit=10000`;
         
-        console.log('Fetching range data from:', url);
-        
-        const response = await fetch(url, { 
-          headers: { 'Accept': 'application/json' } 
-        });
-        
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Error HTTP: ${response.status} - ${response.statusText}. Response: ${errorText}`);
         }
 
         const data = await response.json();
-        console.log('Range data received:', data);
 
         if (data.readings && Array.isArray(data.readings)) {
-          this.rangeChartData = data.readings
-            .map(r => ({
-              time: this.timestampToUnix(r.timestamp),
-              value: r.voltage,
-              originalTimestamp: r.timestamp
-            }))
-            .sort((a, b) => a.time - b.time);
-
-          console.log('Processed range chart data:', this.rangeChartData);
+          const processed = this.processReadingsForChart(data.readings);
+          this.rangeChartData = processed;
           this.isOnline = true;
-          this.showChart = true;
+          this.showChart = processed.length > 0;
         } else if (data.readings === undefined) {
           this.rangeChartData = [];
           this.showChart = false;
-          console.log('No readings found in the specified range');
         } else {
           throw new Error('Formato de datos inválido: la propiedad readings no es un array');
         }
@@ -365,6 +360,7 @@ export default {
         this.rangeLoading = false;
       }
     }
+
   }
 }
 </script>
