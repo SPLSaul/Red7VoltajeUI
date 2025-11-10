@@ -221,7 +221,7 @@ const fetchSensorData = async () => {
   } catch (err) {
     console.error("Error:", err)
     const errorMsg = `Error al obtener los datos del sensor: ${err.response?.data?.detail || err.message}`
-    alert(errorMsg)
+    //alert(errorMsg)
     emit('error', errorMsg)
     results.value = null // ✅ LIMPIAR RESULTADOS EN CASO DE ERROR
   } finally {
@@ -369,7 +369,7 @@ const downloadCSV = async () => {
       }
     } else {
       const errorMsg = err.response?.data?.detail || err.message
-      alert(`Error al descargar CSV: ${errorMsg}`)
+     // alert(`Error al descargar CSV: ${errorMsg}`)
     }
     emit('error', err)
   } finally {
@@ -390,7 +390,8 @@ const formatDateForAPI = (date) => {
   const dd = pad(date.getDate())
   const hh = pad(date.getHours())
   const min = pad(date.getMinutes())
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+  
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:00-08:00`
 }
 
 // Formatear fecha como YYYY-MM-DD para los props del padre

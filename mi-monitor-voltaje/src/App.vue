@@ -256,12 +256,15 @@ export default {
     formatTimestampForDisplay(timestampString) {
       try {
         const date = new Date(timestampString)
-        return date.toLocaleTimeString('en-US', {
+        const correction = -1 * 60 * 60 * 1000; // -1 hora
+        const correctedDate = new Date(date.getTime() + correction);
+        
+        return correctedDate.toLocaleTimeString('es-MX', {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-          timeZone: 'America/Los_Angeles' 
-        }) + ' PDT'
+          timeZone: 'America/Los_Angeles'
+        }) + ' PST'
       } catch (error) {
         console.error('Error formatting timestamp:', error)
         return 'Error en formato'
@@ -270,13 +273,11 @@ export default {
 
   timestampToUnix(timestampString) {
     try {
-      // Opción 1: Usar la zona horaria específica
       const date = new Date(timestampString);
       
-      // Ajustar a PDT (UTC-7) si el timestamp no tiene información de zona
       if (!timestampString.endsWith('Z') && !timestampString.includes('+')) {
-        // Asumir que el timestamp está en America/Los_Angeles
-        const pdtOffset = -7 * 60 * 60 * 1000; // UTC-7 en milisegundos
+
+        const pdtOffset = -9 * 60 * 60 * 1000; 
         return Math.floor((date.getTime() + pdtOffset) / 1000);
       }
       
