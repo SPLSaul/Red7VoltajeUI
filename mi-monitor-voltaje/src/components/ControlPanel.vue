@@ -4,7 +4,6 @@
 
     <!-- Intervalos rápidos -->
     <div class="quick-intervals">
-      <label class="block text-xs font-medium text-gray-700 mb-2">Intervalos rápidos:</label>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="interval in quickIntervals"
@@ -43,14 +42,6 @@
       </div>
     </div>
 
-    <!-- Información del intervalo -->
-    <div v-if="localStartDate && localEndDate" class="interval-info">
-      <p class="text-xs text-gray-600">
-        Intervalo seleccionado: <strong>{{ formatDisplayDate(localStartDate) }}</strong> hasta 
-        <strong>{{ formatDisplayDate(localEndDate) }}</strong>
-        <span v-if="estimatedPoints" class="ml-2">(≈ {{ estimatedPoints }} puntos)</span>
-      </p>
-    </div>
 
     <!-- Botones de acción -->
     <div class="flex gap-2 flex-wrap">
@@ -71,12 +62,6 @@
       </button>
     </div>
 
-    <!-- Información de resultados -->
-    <div v-if="results" class="results-info">
-      <p class="text-sm text-gray-600">
-        Se encontraron <strong>{{ results.count }}</strong> lecturas
-      </p>
-    </div>
   </div>
 </template>
 
